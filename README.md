@@ -6,10 +6,6 @@ How To Write Unit Tests For Angular Jasmine
 # Contents
 ----
 - [Setting Up ESLint In Visual Studio Code](#Setting-Up-ESLint-In-Visual-Studio-Code)
-- [ESLint rules](#ESLint-rules)
-- [Variable Naming Conventions](#Variable-Naming-Conventions)
-- [Filename Naming conventions](#Filename-Naming-Conventions)
-- [General Good Practises](#General-Good-Practises)
 - [Writing Unit Tests](#Writing-Unit-Tests)
   - [Helpful Tips](#Helpful-Tips)
   - [HTML Tests](#HTML-Tests)
