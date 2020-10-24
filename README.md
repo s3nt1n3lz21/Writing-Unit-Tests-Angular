@@ -20,11 +20,11 @@ Within Visual Studio Code, install the ESLint extension and make sure to remove 
 
 You can also set up Visual Studio to automatically reformat and indent your code to align with the ESLint rules when you save a file. Go to File->Preferences->Settings. In the search bar, type 'save' and check the Format On Save box. You can also decide whether you want to format the file on save or the whole project.
 
-![image.png](/.attachments/image-da28d52d-241b-4ea9-baa3-df6ffb551ab8.png)
+![Format On Save](./assets/formatOnSave.png)
 
 Then go to the settings for the ESLint extension and Enable ESLint as a formatter.
 
-![image.png](/.attachments/image-5bbece38-88be-432e-ba98-2d05ae7e5963.png)
+![ESLint Extension](/assets/eslintExtension.png)
 
 # Writing Unit Tests
 ---
