@@ -1,9 +1,8 @@
-# Writing-Unit-Tests-Angular
-How To Write Unit Tests For Angular Jasmine
+# Writing Unit Tests In Angular With Jasmine
 
-# UI Coding Standards & Guidelines
+How To Write Unit Tests For Angular With Jasmine
 
-#Contents
+# Contents
 ----
 - [Setting Up ESLint In Visual Studio Code](#Setting-Up-ESLint-In-Visual-Studio-Code)
 - [Setting Up Code Coverage Checker In Visual Studio Code](#Setting-Up-Code-Coverage-Checker-In-Visual-Studio-Code)
@@ -14,11 +13,13 @@ How To Write Unit Tests For Angular Jasmine
   - [Test Names](#Test-Names)
   - [Checking A Function Is Called Using Spies](#Checking-A-Function-Is-Called-Using-Spies)
   - [Change The Return Value Of A Function](#Change-The-Return-Value-Of-A-Function)
+  - [Change The Return Value Of A Getter](#Change-The-Return-Value-Of-A-Getter)
   - [TS Tests](#TS-Tests)
       1. [Checking Functions Are Called](#1\.-Checking-Functions-Are-Called)
       1. [Checking Fields Are Updated](#2\.-Checking-Fields-Are-Updated)
       1. [Checking The Outputs For Each Input](#3\.-Checking-The-Outputs-For-Each-Input)
       1. [Checking Subscriptions](#4\.-Checking-Subscriptions)
+      1. [Checking Getters And Setters](#5\.-Checking-Getters-And-Setters)
   - [HTML Tests](#HTML-Tests)
       1. [Checking Components Are Displayed](#1\.-Checking-Components-Are-Displayed)
       2. [Checking Text Is Displayed](#2\.-Checking-Text-Is-Displayed)
@@ -33,7 +34,9 @@ How To Write Unit Tests For Angular Jasmine
       -  [Delayed Observables](#Delayed-Observables)
       -  [SetTimeout](#SetTimeout)
       -  [Modals](#Modals)
+  - [Testing Functions Are Called In The Constructor Of A Component](#Testing-Functions-Are-Called-In-The-Constructor-Of-A-Component)
   - [Testing On Push Components](#Testing-On-Push-Components)
+  - [Testing The Change Detector And Components With A Detached Change Detector](#Testing-The-Change-Detector-And-Components-With-A-Detached-Change-Detector)
   - [Testing Local Storage](#Testing-Local-Storage)
   - [Testing Third Party Components](#Testing-Third-Party-Components)
       - [Testing The ng-select Component](#Testing-The-ng-select-Component)
@@ -41,11 +44,15 @@ How To Write Unit Tests For Angular Jasmine
   - [Helpful Tips](#Helpful-Tips)
       - [Run A Single Unit Test Or Spec File](#Run-A-Single-Unit-Test-Or-Spec-File)
       - [UI](#UI)
+      - [Simulating Key Presses](#Simulating-Key-Presses)
+      - [Unit Test Errors On Azure But Not Locally](#Unit-Test-Errors-On-Azure-But-Not-Locally)
+      - [Errors With Functions Being Undefined](#Errors-With-Functions-Being-Undefined)
+      - [Problems With The Expected Result Changing](#Problems-With-The-Expected-Result-Changing)
       - [DebugElement, NativeElement and ComponentInstance](#DebugElement,-NativeElement-and-ComponentInstance)
 
 - [Writing Integration Tests](#Writing-Integration-Tests)
 
-##Setting Up ESLint In Visual Studio Code
+## Setting Up ESLint In Visual Studio Code
 ---
 We use ESLint to automatically check the syntax, formatting and conventions of our code. When you run `ng lint` it will go through all the syntax rules in `.eslintrc.js` and check our code against them. However you can set up ESLint to hightlight any potential issues within the editor as you type your code.
 
@@ -69,45 +76,7 @@ It will highlight the lines that are not covered by unit tests.
 
 ![image.png](/.attachments/image-117dab5f-3824-4767-9a65-a00dbdf30e72.png)
 
-##Variable Naming Conventions
-
----
-- Avoid single-letter names. Be descriptive with your naming
-- Use camelCase
-- Private fields should be prefixed with an underscore
-- Imported services should be prefixed with an underscore
-- Subscriptions should be prefixed with a dollar sign and end with Subscription
-- Subjects should be prefixed with A dollar sign and end with Subject
-
-##Filename Naming Conventions
----
-- All components and services should be the lower case with ```-``` for spaces
-- ```<filename>.<type>.ts```
-  - E.g ```user-profile.component.ts```, ```user-profile.service.ts```
-
-##General Good Practises
----
-- No commented out code should be committed to master
-- Use ```===``` and ```!==``` over ```==``` and ```!=```
-- Use ```const``` when variables are not re-assigned and ```let``` when they are
-- Group all consts and then group all lets
-- Always set variables types 
-- There should be no unused imports and variables
-- Imports should be grouped by Angular, external, components and services
-- There should be no unused services in the constructor
-- Only quote properties that are invalid identifiers
-- Use single quotes for strings
-- Use shortcuts for booleans, but explicit comparisons for strings and numbers
-- Use soft tabs (space character) set to 4 spaces
-- Do not use multiple blank lines to pad your code
-- Do not add spaces inside parentheses
-- Do not add spaces inside brackets
-- Add spaces inside curly braces
-- Don’t save references to this. Use arrow functions or ```bind()``` function
-- Start all comments with a space to make it easier to read
-- Add unique IDs to all HTML elements that the testing team will require for locating elements, i.e. text fields, dropdown lists, checkboxes etc.
-
-##Writing Unit Tests
+## Writing Unit Tests
 ---
 
 In short, you should test everything that could possibly change or cause some event or function to be called. We do not test every static element and every single class that is applied to each element. But we do test that the correct child components we created are present and any classes that vary i.e ```[ngClass]```.
@@ -158,7 +127,15 @@ component.function();
 expect(spy).toHaveBeenCalledWith()  // or toHaveBeenCalledWith('something')
 ```
 
-Using `toHaveBeenCalledWith()` we can be even more specific and check what was passed to the function.
+Using `toHaveBeenCalledWith()` we can be even more specific and check what was passed to the function. We can also use `spy.calls.mostRecent().args` to grab the arguments themselves and test them this way. For example
+
+``` ts
+const spy = spyOn(component, 'functionToBeCalled');
+
+component.function();
+
+expect(spy.calls.mostRecent().args[0]).toEqual('argument1')
+```
 
 We can also spy on the functions of services. But we first have to get a reference to the service in our test. The service first needs to be added to the TestBed in testing-utils.ts. We can then grab that service using `TestBed.inject()`.
 
@@ -182,7 +159,26 @@ const httpClient = TestBed.inject(HttpClient);
 spyOn(httpClient, 'get').and.returnValue(throwError(new Error()));
 ```
 
-###TS Tests
+Note that when you create a spy you are actually replacing the function and if something is expecting a return value from this function and you haven't set one, you'll run into errors.
+
+#### Change The Return Value Of A Getter
+
+You can also change the return value of a getter on some other service. Suppose you have something like the following in a service called `DataService`.
+
+``` ts
+public get data() {
+    return this._data;
+}
+```
+
+In your unit tests you can change the return value by using `spyOnProperty`.
+
+``` ts
+const dataService = TestBed.inject(DataService);
+spyOnProperty(dataService,'data').and.returnValue('test data');
+```
+
+### TS Tests
 ---
 
 When you write unit tests for TS functions you do not have to test all the inner workings of a function just that different inputs result in the right functions being called and the right fields being changed and that you get the right output for each input. You should test enough inputs that every part of the function is executed. Don't forget to test `component.ngOnInit()` and `component.ngOnDestroy()` aswell. You should also test any observables that are subscribed to, even the ones in the constructor and `ngOnInit()`. You should be
@@ -191,6 +187,7 @@ When you write unit tests for TS functions you do not have to test all the inner
 1. [Checking Fields Are Updated](#2\.-Checking-Fields-Are-Updated)
 1. [Checking The Outputs For Each Input](#3\.-Checking-The-Outputs-For-Each-Input)
 1. [Checking Subscriptions](#4\.-Checking-Subscriptions)
+1. [Checking Getters And Setters](#5\.-Checking-Getters-And-Setters)
 
 #### 1. Checking Functions Are Called
 
@@ -202,6 +199,36 @@ const spy = spyOn(component,'functionToBeCalled');
 component.loadData();
 
 expect(spy).toHaveBeenCalledWith();
+```
+
+You can also check that functions are not called
+
+``` ts
+const spy = spyOn(component,'functionToBeCalled');
+
+component.loadData();
+
+expect(spy).not.toHaveBeenCalledWith();
+```
+
+You can also check the spy this way
+
+``` ts
+spyOn(component,'functionToBeCalled');
+
+component.loadData();
+
+expect(component.functionToBeCalled).toHaveBeenCalledWith();
+```
+
+You can also spy on private functions by setting the return type of the spy to `any` and using object key notation instead of dot notation.
+
+``` ts
+spyOn<any>(component,'_privateFunction');
+
+component.loadData();
+
+expect(component['_privateFunction']).toHaveBeenCalledWith();
 ```
 
 #### 2. Checking Fields Are Updated
@@ -265,7 +292,72 @@ apiService['getDataSubject'].next('test value');
 expect(spy).toHaveBeenCalledWith('test value');
 ```
 
-###HTML Tests
+You might also have the situation where we have a variable subscription. We might want to subscribe to two different things depending on some condition but then do the same thing with that data so we assign the sub Suppose we have something like this.
+
+``` ts
+public getData(getThisData) {
+
+    let action: Observable<string>;
+    if (getThisData) {
+        action = this.apiService.getThisData();
+    } else {
+        action = this.apiService.getThatData();
+    }
+
+    action.subscribe((data) => {
+        this.dataService.handleData(data)
+    });
+}
+```
+
+To test that the `handleData()` method is called when the subscription is successful we need to create a new subject and spy on the `getThisData()` and `getThatData()` and set up these methods to return this subject as an observable. Then we can emit a new value from this subject and test `handleData()` is called. The unit test might be.
+
+``` ts
+it('should handle the data when getting this data', () => {
+    const apiService = TestBed.inject(ApiService);
+    const dataService = TestBed.inject(DataService);
+    const actionSubject = new BehaviorSubject<string>(null);
+    spyOn(apiService,'getThisData').and.returnValue(actionSubject.asObservable());
+    spyOn(dataService,'handleData');
+    component.getData(true);
+
+    actionSubject.next('test data');
+
+    expect(dataService.handleData).toHaveBeenCalledWith('test data');
+})
+```
+
+#### 5. Checking Getters And Setters
+
+Suppose you had the following getter method on your component.
+
+```
+public get getData(): Data {
+    return this._data;
+}
+```
+
+To test it, you just simply call the getter like any other function but don't add parentheses.
+
+```
+const result = component.getData;
+```
+
+And suppose you have the following setter.
+
+```
+public set setData(data) {
+    this._data = data;
+}
+```
+
+To test this you call it by assigning a value to it.
+
+```
+component.setData = data;
+```
+
+### HTML Tests
 
 ---
 
@@ -475,31 +567,48 @@ expect(spy).toHaveBeenCalledWith(jasmine.any(Event));
 
 #### 7. Checking Child Components Are Passed The Correct Inputs
 
-We also should check that a component passes the right inputs to its child components. Suppose we have the following component 
+We also should check that a component passes the right inputs to its child components. Suppose we have a component with the following template html. It contains a child component called `TeamDropdown` with the selector `app-team-dropdown` which has inputs.
 
 ``` html
-<app-team-selector
+<app-team-dropdown
     id="team"
     [items]="teams"
     [value]="currentTeam"
     [disabled]="teamsDisabled"
-></app-team-selector>
+></app-team-dropdown>
 ```
 
-When testing inputs to child components we grab the component using the `componentInstance`.
+If the child component is our own custom component then we need to make sure to add a mocked version of the component in testing-utils.ts. The mocked component for this might be.
+
+``` ts
+@Component({
+    selector: 'app-team-dropdown',
+    template: '',
+})
+class TeamDropdown {
+    private _items;
+    @Input() public set items(value) {
+        if (value) {
+            this._items = value;
+        }
+    }
+    @Input() public value;
+    @Input() public disabled;
+}
+```
+
+When testing inputs to child components we grab the component using the `componentInstance` to be able to get access to the data on that component.
 
 ``` ts
 const teamSelectorComponent = componentFixture.debugElement.query(By.css('#team')).componentInstance;
-expect(teamSelectorComponent.items).toEqual(component.teams);
+expect(teamSelectorComponent.['_items']).toEqual(component.teams);
 expect(teamSelectorComponent.value).toEqual(component.currentTeam);
 expect(teamSelectorComponent.disabled).toEqual(component.teamsDisabled);
 ```
 
-We need to check that the property `items` does exist on the child component we are testing. Sometimes it might set a private property instead e.g. `_items`. In this case you can still access private properties using
+Note: We do not create a test wrapper parent component and test that its properties are passed down to the component we want to test as those parent properties are meaningless. We just made those up. We want to test each real component's properties are passed down to its child components correctly.
 
-``` ts
-expect(teamSelectorComponent['_items']).toEqual(component.teams);
-```
+If we are testing a built in component like `<input>` then we just use nativeElement.
 
 #### 8. Testing User Inputs Update The Correct Field
 
@@ -632,6 +741,56 @@ beforeEach(() => {
 });
 ```
 
+#### Testing Functions Are Called In The Constructor Of A Component
+
+To test functions are called within the constructor of a component you must use the TestBed to create a new component to trigger the constructor again as you can't just call the constructor like a normal method. Suppose we have the constructor below for the component called `MyComponent`.
+
+``` ts
+constructor(
+    private _apiService: ApiService,
+) {
+    this._apiService.getData();
+}
+```
+
+The unit test might be
+
+``` ts
+it('should get the data from the api on construction', () => {
+    const apiService = TestBed.inject(ApiService);
+    spyOn(apiService,'getData');
+
+    TestBed.createComponent(MyComponent);
+
+    expect(apiService.getData).toHaveBeenCalledWith();
+});
+```
+
+#### Testing The Change Detector Functions Are Called In The Constructor Of A Component
+
+Checking the change detector's functions are called in the constructor is a special case as ChangeDetectorRef is not like a normal service. Instead of using the TestBed to grab a reference to the change detector we have to use the injector on the component itself and then we spy on the change detector prototype's functions. Suppose we have the following constructor for the component called MyComponent. 
+
+``` ts
+constructor(
+    private _cdr: ChangeDetectorRef,
+) {
+    this._cdr.detach();
+}
+```
+
+The unit test might be
+
+``` ts
+it('should detach from the change detector on construction', () => {
+    const changeDetectorRef = componentFixture.debugElement.injector.get(ChangeDetectorRef); 
+    const detectChangesSpy = spyOn(changeDetectorRef.constructor.prototype, 'detach');
+
+    TestBed.createComponent(MyComponent);
+
+    expect(detectChangesSpy).toHaveBeenCalledWith();
+});
+```
+
 #### Testing On Push Components
 
 On push components are those that have a change detection strategy set to OnPush. This means that the UI only updates when the fields are assigned new references. So it will update if an immutable field is updated like a string, but not if a mutable field is updated like an array. This helps to prevent the UI keep updating with every little change, which ends up making it more unresponsive. 
@@ -670,7 +829,57 @@ beforeEach(async(() => {
 
 Then we just test the component like normal.
 
-In OnPush components you can also manually update the UI yourself by calling `componentFixture.detectChanges()` in your component. To check that the `cdr.detectChanges()` method is called in unit tests you can grab a reference to the change detector like this
+#### Testing The Change Detector And Components With A Detached Change Detector
+
+The change detector is what automatically updates the UI when the data and components fields are updated. Normally it checks for changes automatically and updates the UI after every single change in the values of the fields. However, when we set values for the components fields in the unit tests the UI doesn't automatically update and we have to call `componentFixture.detectChanges()` to manually update the UI.
+
+Note: Because you don't deal with the UI in TS unit tests you don't have to call this function when writing TS tests.
+
+We can also update the UI manually within the TS of the component by adding a reference to the change detector in the constructor and then calling the `detectChanges()` method on this.
+
+``` ts
+constructor(
+    private _cdr: ChangeDetectorRef
+) {
+    this.loadData();
+}
+
+public loadData() {
+    // Load the data
+    ...
+    // Update the UI when finished loading the data
+    this._cdr.detectChanges();
+}
+```
+
+Sometimes we just detach the change detector completely and stop it from automatically updating the UI and only update it manually ourselves when we want it to. For example, there may be loads of data changing frequently and we don't want to update the UI every single time otherwise it will become unresponsive. Instead, we can update it after all the data has stopped changing or only every so often.
+
+But if we detatch it completely during initialisation then using `componentFixture.detectChanges()` within our unit tests will no longer work. 
+
+``` ts
+constructor(
+    private _cdr: ChangeDetectorRef
+) {
+    // Detaches the component from change detection when constructed
+    this._cdr.detach();
+    this.loadData();
+    this._cdr.detectChanges();
+}
+```
+
+Instead we will need to grab a reference to the change detector that we have already included in the TS of the component and call `detectChanges()` on this instead. We just need to replace all
+
+``` ts
+componentFixture.detectChanges();
+```
+
+with
+
+``` ts
+component['_cdr'].detectChanges();
+```
+
+To check that the `cdr.detectChanges()` method is called within the TS of your component, in your unit tests you can spy on the change detector like this.
 
 ``` ts
 const changeDetectorRef = componentFixture.debugElement.injector.get(ChangeDetectorRef);
@@ -740,12 +949,12 @@ it('should update the components selected time value when the user updates the t
     const spy = spyOn(component, 'selectAllTimeValue');
 
     const timePeriodSelectorComponent = componentFixture.debugElement.query(By.css('#sltTimePeriodSolutionDashboard'));
-    triggerKeyDownEvent(timePeriodSelectorComponent, 32); // open the ng select
+    triggerKeyDownEvent(timePeriodSelectorComponent, 32); // space to open the ng select
     // We need to tick and detect changes as the dropdown fully initialises after the promise is resolved
     componentFixture.detectChanges();
     tick();
-    triggerKeyDownEvent(timePeriodSelectorComponent, 1); // select first option
-    triggerKeyDownEvent(timePeriodSelectorComponent, 13); // enter button
+    triggerKeyDownEvent(timePeriodSelectorComponent, 40); // down arrow
+    triggerKeyDownEvent(timePeriodSelectorComponent, 13); // enter
 
     flush();
     expect(spy).toHaveBeenCalledWith(jasmine.any(Object));
@@ -799,6 +1008,10 @@ expect(is(component.data,expectedData)).toEqual(true);
 
 - [Run A Single Unit Test Or Spec File](#Run-A-Single-Unit-Test-Or-Spec-File)
 - [UI](#UI)
+- [Simulating Key Presses](#Simulating-Key-Presses)
+- [Unit Test Errors On Azure But Not Locally](#Unit-Test-Errors-On-Azure-But-Not-Locally)
+- [Errors With Functions Being Undefined](#Errors-With-Functions-Being-Undefined)
+- [Problems With The Expected Result Changing](#Problems-With-The-Expected-Result-Changing)
 - [DebugElement, NativeElement and ComponentInstance](#DebugElement,-NativeElement-and-ComponentInstance)
 
 #### Run A Single Unit Test Or Spec File
@@ -808,6 +1021,75 @@ You can run the unit tests for just one file by replacing `describe` with `fdesc
 #### UI
 
 If you go to ```localhost:9876``` you can load up a UI that displays the components you are testing and the results.
+
+#### Simulating Key Presses
+
+You can simulate a key press on an element by using the following function
+
+
+```
+function triggerKeyDownEvent(element: DebugElement, which: number, key = ''): void {
+    element.triggerEventHandler('keydown', {
+        which: which,
+        key: key,
+        preventDefault: () => { },
+    });
+}
+
+const component = componentFixture.debugElement.query(By.css('#someId'));
+triggerKeyDownEvent(component, 32); // space
+triggerKeyDownEvent(component, 40); // down arrow
+triggerKeyDownEvent(component, 13); // enter
+```
+
+You use can use this website to find the keycode for any key.
+
+https://css-tricks.com/snippets/javascript/javascript-keycodes/
+
+#### Unit Test Errors On Azure But Not Locally
+
+Note that when you create a PR and Azure runs the unit tests, it will run the unit tests as if the PR has already been merged with master. So you may encounter unit test errors on Azure that you don't locally. Be sure to pull down and merge in the lastest master branch so you can fix these.
+
+#### Errors With Functions Being Undefined
+
+Sometimes when adding unit tests you might get some errors with functions not being defined, especially when first adding a new spec file for a component. This is because there are functions on services that the component is trying to call that are not defined on the mocked services within testing-utils.ts. You just need to add them to the mocked services and just return some dummy test data. Note that before each unit test the code in the constructor and `ngOnInit()` is called.
+
+#### Problems With The Expected Result Changing
+
+Be careful when using reusable test data which has an `Object` type or contains something with an `Object` type. `Object`s get copied by reference instead of by value in assignment statements. 
+
+This means that when you initialize a field to an `Object` and then run that test it will change the actual test data. If that test data is then used in later unit tests, those tests will be expecting something different. 
+
+``` ts
+const testData = { key: 'value' };
+...
+it('should not change the resuable test data in assignments', () => { 
+    component.data = testData;
+    ...
+});
+...
+it('should not change the resuable test data in functions', () => { 
+    component.changeData(testData);
+    ...
+});
+```
+
+You can avoid this by using the function `cloneDeep()` from the library `lodash` on the test data you assign to components or pass into functions. This makes a deep copy of the object instead of copying its reference.
+
+``` ts
+import cloneDeep from 'lodash/cloneDeep';
+const testData = { key: 'value' };
+...
+it('should not change the resuable test data in assignments', () => { 
+    component.data = cloneDeep(testData);
+    ...
+});
+...
+it('should not change the resuable test data in functions', () => { 
+    component.changeData(cloneDeep(testData));
+    ...
+});
+```
 
 #### DebugElement, NativeElement and ComponentInstance
 
@@ -825,7 +1107,7 @@ debugElement.query(By.css())
 debugElement.query(By.css()).nativeElement
 debugElement.query(By.css()).componentInstance
 
-###Writing Integration Tests
+### Writing Integration Tests
 ---
 
 In unit tests we replace all the child components and services with simple mocked versions. In Integration tests we include the actual child components. We write integration tests in a separate file. There are automated integration tests written by testers so developers shouldn’t have to write many of these.
